@@ -29,6 +29,46 @@ def benchmark_stress_tier(benchmark: Benchmark):
     return 0
 
 
+def _phase_profile(tier: int, target_util: float):
+    """
+    Select optimization profile by stress tier.
+
+    This is intentionally benchmark-agnostic: only tier/utilization drive switches.
+    """
+    match tier:
+        case 0:
+            return {
+                "congestion_start_frac": 0.60,
+                "pilot_congestion_weight": 0.20,
+                "lbfgs_congestion_weight": 0.00,
+            }
+        case 1:
+            cstart = 0.54
+            if target_util >= 0.62:
+                cstart -= 0.04
+            if target_util >= 0.70:
+                cstart -= 0.04
+            return {
+                "congestion_start_frac": float(min(0.65, max(0.30, cstart))),
+                "pilot_congestion_weight": 0.50,
+                "lbfgs_congestion_weight": 0.05,
+            }
+        case _:
+            cstart = 0.48
+            if target_util >= 0.62:
+                cstart -= 0.04
+            if target_util >= 0.70:
+                cstart -= 0.04
+            lbfgs_cw = 0.08
+            if target_util >= 0.62:
+                lbfgs_cw *= 1.1
+            return {
+                "congestion_start_frac": float(min(0.65, max(0.28, cstart))),
+                "pilot_congestion_weight": 0.50,
+                "lbfgs_congestion_weight": float(min(lbfgs_cw, 0.1)),
+            }
+
+
 def _uniform_spread(benchmark: Benchmark, dev, dt):
     nh = benchmark.num_hard_macros
     cw = float(benchmark.canvas_width)
@@ -282,6 +322,7 @@ def _run_phase1(
     gamma_s,
     gamma_e,
     tier,
+    congestion_start_frac,
     dev,
     dt,
 ):
@@ -300,7 +341,12 @@ def _run_phase1(
         wl_n = _wa_wirelength(all_pos, net_idx, net_mask, gamma) / wl_0
         dl_n = density_fn(p) / density_norm
 
-        ramp = max(0.0, (k - global_iters * 0.6) / (global_iters * 0.4))
+        if tier == 0 and abs(congestion_start_frac - 0.6) < 1e-9:
+            # Exact legacy ramp used by the original tier-0 behavior.
+            ramp = max(0.0, (k - global_iters * 0.6) / (global_iters * 0.4))
+        else:
+            ramp_span = max(1e-6, 1.0 - congestion_start_frac)
+            ramp = max(0.0, (frac - congestion_start_frac) / ramp_span)
         tier_cw = [0.05, 0.15, 0.25][tier]
         cong_w = tier_cw * ramp
         if cong_w > 0:
@@ -426,6 +472,8 @@ class AnalyticalPlacer:
 
         total_area_halo = (sizes_halo[:nm, 0] * sizes_halo[:nm, 1]).sum().item()
         target_util = total_area_halo / (cw * ch)
+        profile = _phase_profile(tier, target_util)
+        congestion_start_frac = profile["congestion_start_frac"]
 
         pos = _uniform_spread(benchmark, dev, dt)
 
@@ -494,6 +542,7 @@ class AnalyticalPlacer:
             self.gamma_s,
             gamma_e_adapt,
             tier,
+            congestion_start_frac,
             dev,
             dt,
         )
@@ -528,6 +577,7 @@ class AnalyticalPlacer:
             self.gamma_s,
             gamma_e_adapt,
             tier,
+            congestion_start_frac,
             dev,
             dt,
         )
@@ -540,15 +590,77 @@ class AnalyticalPlacer:
             apos_b = torch.cat([pos_b, port_pos], dim=0)
             wl_a = _wa_wirelength(apos_a, net_idx, net_mask, gamma_eval).item()
             wl_b = _wa_wirelength(apos_b, net_idx, net_mask, gamma_eval).item()
-            d_a = _density_topk(pos_a, sizes_halo, nm, gx, gy, bw, bh).item()
-            d_b = _density_topk(pos_b, sizes_halo, nm, gx, gy, bw, bh).item()
+            topk_a = _density_topk(pos_a, sizes_halo, nm, gx, gy, bw, bh).item()
+            topk_b = _density_topk(pos_b, sizes_halo, nm, gx, gy, bw, bh).item()
+            edens_a = _density_edensity(
+                pos_a, sizes_halo, nm, gx, gy, bw, bh, target_util, K2_inv
+            ).item()
+            edens_b = _density_edensity(
+                pos_b, sizes_halo, nm, gx, gy, bw, bh, target_util, K2_inv
+            ).item()
             c_a = _congestion_loss(apos_a, net_idx, net_mask, gx, gy, bw, bh, gamma_eval).item()
             c_b = _congestion_loss(apos_b, net_idx, net_mask, gx, gy, bw, bh, gamma_eval).item()
-            score_a = wl_a / wl_0 + 0.5 * d_a / topk_0 + 0.5 * c_a / cl_0
-            score_b = wl_b / wl_0 + 0.5 * d_b / topk_0 + 0.5 * c_b / cl_0
+            if tier == 0:
+                # Keep tier-0 winner selection identical to the original behavior.
+                score_a = wl_a / wl_0 + 0.5 * topk_a / topk_0 + 0.5 * c_a / cl_0
+                score_b = wl_b / wl_0 + 0.5 * topk_b / topk_0 + 0.5 * c_b / cl_0
+            else:
+                pilot_cw = profile["pilot_congestion_weight"]
+                pilot_dw = (1.0 - pilot_cw) * 0.5
+                score_a = (
+                    wl_a / wl_0
+                    + pilot_dw * topk_a / topk_0
+                    + pilot_dw * edens_a / edens_0
+                    + pilot_cw * c_a / cl_0
+                )
+                score_b = (
+                    wl_b / wl_0
+                    + pilot_dw * topk_b / topk_0
+                    + pilot_dw * edens_b / edens_0
+                    + pilot_cw * c_b / cl_0
+                )
+
+        phase1_cont_congestion_start_frac = congestion_start_frac
+        tier0_stress_mode = False
+        if tier == 0:
+            # Trigger enhanced tier-0 behavior only when pilot indicates
+            # simultaneous density/congestion stress or ambiguous branch race.
+            score_gap = abs(score_a - score_b)
+            base_use_edensity = score_b < score_a
+            if score_a <= score_b:
+                best_topk_norm = topk_a / topk_0
+                best_cong_norm = c_a / cl_0
+            else:
+                best_topk_norm = topk_b / topk_0
+                best_cong_norm = c_b / cl_0
+            dense_hotspot = best_topk_norm > 1.10
+            congestion_hotspot = best_cong_norm > 1.06
+            close_race = score_gap < 0.035
+            topk_under_congestion = (not base_use_edensity) and (best_cong_norm > 1.12)
+            tier0_stress_mode = topk_under_congestion or (
+                dense_hotspot and (congestion_hotspot or close_race)
+            )
+            if tier0_stress_mode:
+                hybrid_cw = 0.35
+                hybrid_dw = (1.0 - hybrid_cw) * 0.5
+                score_a = (
+                    wl_a / wl_0
+                    + hybrid_dw * topk_a / topk_0
+                    + hybrid_dw * edens_a / edens_0
+                    + hybrid_cw * c_a / cl_0
+                )
+                score_b = (
+                    wl_b / wl_0
+                    + hybrid_dw * topk_b / topk_0
+                    + hybrid_dw * edens_b / edens_0
+                    + hybrid_cw * c_b / cl_0
+                )
+                phase1_cont_congestion_start_frac = 0.52
 
         use_edensity = score_b < score_a
         winner = "eDensity" if use_edensity else "top-k"
+        if tier0_stress_mode:
+            winner += "+stress"
         winner_pos = pos_b if use_edensity else pos_a
         winner_fn = edens_fn if use_edensity else topk_fn
         winner_norm = edens_0 if use_edensity else topk_0
@@ -592,6 +704,7 @@ class AnalyticalPlacer:
             self.gamma_s,
             gamma_e_adapt,
             tier,
+            phase1_cont_congestion_start_frac,
             dev,
             dt,
         )
@@ -612,13 +725,17 @@ class AnalyticalPlacer:
             )
             gamma_l = max(diag * gamma_e_adapt * 1.15, 0.06)
             dw_l = dw_e_adapt * 0.82
+            cw_l = profile["lbfgs_congestion_weight"]
+            if tier0_stress_mode:
+                cw_l = 0.02
 
             def _closure():
                 opt_lbfgs.zero_grad()
                 apos = torch.cat([p_l, port_pos], dim=0)
                 wl = _wa_wirelength(apos, net_idx, net_mask, gamma_l) / wl_0
                 dl = winner_fn(p_l) / winner_norm
-                lo = wl + dw_l * dl
+                cl = _congestion_loss(apos, net_idx, net_mask, gx, gy, bw, bh, gamma_l) / cl_0
+                lo = wl + dw_l * dl + cw_l * cl
                 lo.backward()
                 with torch.no_grad():
                     p_l.grad[fixed] = 0.0
