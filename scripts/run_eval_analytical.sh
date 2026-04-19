@@ -11,4 +11,5 @@ if [ ! -d "${CHALLENGE_DIR}" ]; then
 fi
 
 cd "${CHALLENGE_DIR}"
+# Same entry as scripts/run_eval.sh (v6 pilot). Kept for existing workflows.
 PYTHONPATH="${CHALLENGE_DIR}" python3 -m macro_place.evaluate "${ROOT_DIR}/src/analytical_placer.py" "$@"

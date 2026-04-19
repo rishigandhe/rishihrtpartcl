@@ -1,14 +1,13 @@
 """
-VNext placer entrypoint for the challenge harness.
+Legacy VNext placer entry for the challenge harness (modular ``hrt_place`` pipeline).
 
-Architecture: same smooth objective as the analytical package (WA wirelength + density),
-but Phase 1 is **Adam + L-BFGS polish** before legalization.
+Architecture: WA wirelength + density, Adam + L-BFGS before legalization.
 
-The class **must** live in this module so `macro_place.evaluate` finds it
-(`__module__ == "placer_vnext"`).
+The class **must** live in this module so ``macro_place.evaluate`` finds it
+(``__module__ == "placer_vnext"``).
 
-`scripts/run_eval.sh` evaluates this file by default. Adam-only:
-  bash scripts/run_eval_analytical.sh -b ibm01
+**Default submission** is ``analytical_placer.py`` (GPU v6 pilot). Run it with
+``bash scripts/run_eval.sh`` or evaluate ``src/analytical_placer.py`` directly.
 """
 
 from __future__ import annotations

@@ -20,7 +20,7 @@ import torch
 ROOT_DIR = Path(__file__).resolve().parent.parent
 CHALLENGE_DIR = ROOT_DIR / ".deps" / "macro-place-challenge-2026"
 TESTCASE_ROOT = CHALLENGE_DIR / "external" / "MacroPlacement" / "Testcases" / "ICCAD04"
-PLACER_PATH = ROOT_DIR / "src" / "placer_vnext.py"
+PLACER_PATH = ROOT_DIR / "src" / "analytical_placer.py"
 
 # High-proxy / heavy-runtime cases from a full IBM sweep (order: worst proxy first).
 HARD_SUITE = [
@@ -54,7 +54,7 @@ def _load_analytical_module():
             placer_cls = attr
             break
     if placer_cls is None:
-        raise RuntimeError("No placer class in placer_vnext.py")
+        raise RuntimeError("No placer class in analytical_placer.py")
     return mod, placer_cls
 
 

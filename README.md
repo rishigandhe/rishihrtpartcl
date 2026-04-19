@@ -7,9 +7,9 @@ It does **not** commit the challenge repo, testcases, or large benchmark assets.
 
 ## Included
 
-- `src/hrt_place/` — modular placer (losses, legalize, `AnalyticalPlacer`, optional `backends/dreamplace.py` hook)
-- `src/placer_vnext.py` — challenge entry (VNext: Adam + L-BFGS); **`evaluate` loads this by default**
-- `src/analytical_placer.py` — thin subclass for `run_eval_analytical.sh` / grid search
+- `src/placer_v6_pilot.py` — **main placer** (FP32 GPU, pilot top-k vs eDensity, halos, L-BFGS, congestion); best ICCAD04 proxy in this repo
+- `src/analytical_placer.py` — default harness entry (thin subclass of v6 so `evaluate`’s `__module__` check passes); used by `run_eval.sh`, `run_eval_analytical.sh`, and `grid_search.py`
+- `src/hrt_place/` + `src/placer_vnext.py` — legacy modular VNext pipeline (Adam + L-BFGS) if you want to compare or tune that path
 - `src/proxy_refine.py`, `src/grid_search.py`, `scripts/setup_benchmark_env.sh`, `scripts/run_eval.sh`
 
 ## Quick start

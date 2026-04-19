@@ -1,8 +1,8 @@
 """
 HRT / Partcl macro placement code (modular).
 
-Entry points for the competition harness live at repo ``src/placer_vnext.py`` and
-``src/analytical_placer.py`` (shim).
+Competition default: ``src/analytical_placer.py`` (shim to ``placer_v6_pilot.py``).
+Legacy VNext harness entry: ``src/placer_vnext.py``.
 """
 
 from hrt_place.analytical import AnalyticalPlacer
