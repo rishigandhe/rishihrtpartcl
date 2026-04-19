@@ -5,8 +5,7 @@ Implementation lives in ``placer_v6_pilot.py``. A subclass is defined here so
 ``macro_place.evaluate`` accepts the loader's ``__module__`` check
 (``__module__ == "analytical_placer"``).
 
-Legacy modular pipeline (Adam + L-BFGS VNext): ``hrt_place/`` and
-``placer_vnext.py``.
+Benchmarks and evaluator ship in-repo under ``external/`` and ``macro_place/``.
 """
 
 from __future__ import annotations

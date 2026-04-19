@@ -1,46 +1,55 @@
 # rishihrtpartcl
 
-Minimal private workspace for your Partcl/HRT macro placement work.
+GPU **V6 analytical macro placer** (pilot race: top-k vs eDensity density, macro halos, Adam + L-BFGS, congestion ramp) with the **IBM ICCAD04** benchmarks and **`macro_place`** evaluator **vendored in this repo** so you can clone and run anywhere (no separate `.deps` clone).
 
-This repo intentionally keeps only your code and lightweight runner scripts.
-It does **not** commit the challenge repo, testcases, or large benchmark assets.
+Reference full-suite proxy (uniform spread init, typical GPU run): **average ≈ 1.36** (machine-dependent).
 
-## Included
+## Size
 
-- `src/placer_v6_pilot.py` — **main placer** (FP32 GPU, pilot top-k vs eDensity, halos, L-BFGS, congestion); best ICCAD04 proxy in this repo
-- `src/analytical_placer.py` — default harness entry (thin subclass of v6 so `evaluate`’s `__module__` check passes); used by `run_eval.sh`, `run_eval_analytical.sh`, and `grid_search.py`
-- `src/hrt_place/` + `src/placer_vnext.py` — legacy modular VNext pipeline (Adam + L-BFGS) if you want to compare or tune that path
-- `src/proxy_refine.py`, `src/grid_search.py`, `scripts/setup_benchmark_env.sh`, `scripts/run_eval.sh`
+About **~800 MB** of testcase + parser data under `external/`.
 
-## Quick start
-
-1. Create a virtual env and install deps:
+## Setup
 
 ```bash
+git clone https://github.com/rishigandhe/rishihrtpartcl.git
+cd rishihrtpartcl
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-2. Pull benchmark dependency locally (not committed):
+## Run
+
+From the repo root:
 
 ```bash
-bash scripts/setup_benchmark_env.sh
-```
-
-3. Run a benchmark on your placer:
-
-```bash
+source .venv/bin/activate
 bash scripts/run_eval.sh -b ibm01
+bash scripts/run_eval.sh --all
 ```
 
-4. Run local grid search:
+Or:
 
 ```bash
-python src/grid_search.py --benchmarks ibm01
+export PYTHONPATH="$(pwd)"
+python3 -m macro_place.evaluate "$(pwd)/src/analytical_placer.py" --all
 ```
 
-## Notes
+CUDA + a GPU-enabled PyTorch build are recommended; CPU works but is slower.
 
-- Benchmarks and evaluator are loaded from `.deps/macro-place-challenge-2026`.
-- Nothing under `.deps/` is tracked by git to keep this repo lean.
+## Layout
+
+| Path | Role |
+|------|------|
+| `src/placer_v6_pilot.py` | Placer implementation |
+| `src/analytical_placer.py` | Harness entry (`evaluate` loads this path) |
+| `macro_place/` | Challenge evaluator (`evaluate`, proxy, loader) |
+| `external/MacroPlacement/CodeElements/Plc_client/` | `PlacementCost` / netlist parser |
+| `external/MacroPlacement/Testcases/ICCAD04/` | `ibm01` … `ibm18` |
+
+## Attribution
+
+- Testcases and `Plc_client` from [MacroPlacement](https://github.com/partcleda/MacroPlacement) (Partcl).
+- Evaluator layout from [macro-place-challenge-2026](https://github.com/partcleda/macro-place-challenge-2026).
+
+Placer implementation: Rishi Gandhe.
