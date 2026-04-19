@@ -7,10 +7,10 @@ It does **not** commit the challenge repo, testcases, or large benchmark assets.
 
 ## Included
 
-- `src/analytical_placer.py`
-- `src/grid_search.py`
-- `scripts/setup_benchmark_env.sh`
-- `scripts/run_eval.sh`
+- `src/hrt_place/` — modular placer (losses, legalize, `AnalyticalPlacer`, optional `backends/dreamplace.py` hook)
+- `src/placer_vnext.py` — challenge entry (VNext: Adam + L-BFGS); **`evaluate` loads this by default**
+- `src/analytical_placer.py` — thin subclass for `run_eval_analytical.sh` / grid search
+- `src/proxy_refine.py`, `src/grid_search.py`, `scripts/setup_benchmark_env.sh`, `scripts/run_eval.sh`
 
 ## Quick start
 

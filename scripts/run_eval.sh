@@ -11,4 +11,12 @@ if [ ! -d "${CHALLENGE_DIR}" ]; then
 fi
 
 cd "${CHALLENGE_DIR}"
-PYTHONPATH="${CHALLENGE_DIR}" python3 -m macro_place.evaluate "${ROOT_DIR}/src/analytical_placer.py" "$@"
+PLACER="${ROOT_DIR}/src/placer_vnext.py"
+if [ ! -f "${PLACER}" ]; then
+  echo "Missing placer at ${PLACER}"
+  exit 1
+fi
+echo "repo: ${ROOT_DIR}"
+echo "placer: ${PLACER}  (loads analytical_placer.py from same src/ dir)"
+# Default benchmark = VNext (Adam + L-BFGS). Adam-only: scripts/run_eval_analytical.sh
+PYTHONPATH="${CHALLENGE_DIR}" python3 -m macro_place.evaluate "${PLACER}" "$@"

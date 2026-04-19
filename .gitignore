@@ -9,3 +9,7 @@ __pycache__/
 
 # Grid-search outputs
 results/
+
+# Local eval logs / caches
+.cache/
+.eval*.log

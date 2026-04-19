@@ -86,7 +86,11 @@ def run_grid_search(benchmarks, output_path):
         t_cfg = time.time()
         for name in benchmarks:
             bm, plc = bench_data[name]
-            placer = placer_class(dw_start=cfg["dw_start"], dw_end=cfg["dw_end"])
+            placer = placer_class(
+                dw_start=cfg["dw_start"],
+                dw_end=cfg["dw_end"],
+                verbose=False,
+            )
             t0 = time.time()
             costs = _evaluate(placer, bm, plc)
             elapsed = time.time() - t0
@@ -113,6 +117,10 @@ def run_grid_search(benchmarks, output_path):
             f"dw_end={cfg['dw_end']:.3f}  dw_start={cfg['dw_start']:.4f}  "
             f"->  avg={avg:.4f}  ({elapsed_cfg:.1f}s){marker}"
         )
+
+    if not results:
+        print("\nNo valid hyperparameter combinations (e.g. all had dw_start >= dw_end).")
+        return None, float("inf")
 
     results.sort(key=lambda r: r["avg_proxy"])
 
